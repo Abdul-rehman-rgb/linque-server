@@ -1,56 +1,41 @@
-import Reservation from '../Models/Reservation.js';
-import Restaurant from '../Models/Restaurant.js';
-import Notification from '../Models/Notification.js';
-import User from '../Models/User.js';
+import Reservation from "../Models/Reservation.js";
+import ReservationSlot from "../Models/ReservationSlot.js";
+import Notification from "../Models/Notification.js";
 
-// Customer creates reservation
-export const createReservation = async (req, res) => {
+export const bookReservation = async (req, res) => {
   try {
-    const { restaurantId, reservationDate, reservationDay, numberOfPersons, notes } = req.body;
+    const { restaurantId, reservationDate, reservationTime, numberOfPersons, notes } = req.body;
+    const customerId = req.user._id;
+
+    const slot = await ReservationSlot.findOne({
+      restaurant: restaurantId,
+      date: reservationDate,
+      time: reservationTime,
+    });
+
+    if (!slot || slot.availableSlots <= 0 || numberOfPersons > slot.personsPerSlot) {
+      return res.status(400).json({ success: false, message: "Slot unavailable or exceeds limit." });
+    }
+
+    slot.availableSlots -= 1;
+    await slot.save();
 
     const reservation = await Reservation.create({
-      customer: req.user._id,
+      customer: customerId,
       restaurant: restaurantId,
       reservationDate,
-      reservationDay,
+      reservationTime,
       numberOfPersons,
       notes,
     });
 
+    const customerMsg = `Your reservation at ${reservationTime} on ${reservationDate} is confirmed.`;
+    const vendorMsg = `${req.user.name} booked ${numberOfPersons} seat(s) on ${reservationDate} at ${reservationTime}.`;
+
+    await Notification.create({ user: customerId, message: customerMsg, type: "customer" });
+    await Notification.create({ vendor: restaurantId, message: vendorMsg, type: "vendor" });
+
     res.status(201).json({ success: true, reservation });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-};
-
-// Vendor views reservations for their restaurant
-export const getVendorReservations = async (req, res) => {
-  try {
-    const reservations = await Reservation.find({ restaurant: req.vendor.restaurant })
-      .populate('customer', 'name email contactNumber')
-      .sort({ createdAt: -1 });
-
-    res.status(200).json({ success: true, reservations });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-};
-
-// Vendor updates reservation status and notifies customer
-export const updateReservationStatus = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
-
-    const reservation = await Reservation.findByIdAndUpdate(id, { status }, { new: true })
-      .populate('customer')
-      .populate('restaurant');
-
-    const message = `Your reservation has been ${status} at ${reservation.restaurant.name} on ${reservation.reservationDay}, ${new Date(reservation.reservationDate).toLocaleDateString()}`;
-
-    await Notification.create({ user: reservation.customer._id, message });
-
-    res.status(200).json({ success: true, reservation });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }

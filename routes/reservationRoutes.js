@@ -1,11 +1,9 @@
 import express from "express";
-import { createReservation, getVendorReservations, updateReservationStatus } from "../controllers/reservationController.js";
+import { bookReservation } from "../controllers/reservationController.js";
 import authMiddleware from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.post("/reservations", authMiddleware, createReservation);
-router.get("/reservations", authMiddleware, getVendorReservations);
-router.put("/reservations/:id", authMiddleware, updateReservationStatus);
+router.post("/reservations", authMiddleware, bookReservation);
 
 export default router;
