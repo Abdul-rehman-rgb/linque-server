@@ -1,14 +1,32 @@
 import { createClient } from 'redis';
 import { Server } from 'socket.io';
-import { createAdapter } from '@socket.io/redis-adapter'; 
-
+import { createAdapter } from '@socket.io/redis-adapter';
 import dotenv from 'dotenv';
+
+
 dotenv.config();
 
 let io;
 const userSocketMap = new Map();
 
 export const initSocket = async (httpServer) => {
+
+  //*************** WHEN PRODUCTION MODE IS ON ***************
+  // io = new Server(httpServer, {
+  //   cors: {
+  //     origin: [
+  //       'http://localhost:3000',
+  //       'http://localhost:19006',
+  //       'exp://localhost:19000',
+  //       'https://vendor.linque.com',
+  //       'https://linque-server.up.railway.app'
+  //     ],
+  //     methods: ['GET', 'POST'],
+  //     credentials: true
+  //   },
+  // });
+
+  //*************** WHEN DEVELOPMENT MODE IS ON ***************
   io = new Server(httpServer, {
     cors: {
       origin: '*',

@@ -21,6 +21,24 @@ const app = express();
 const server = http.createServer(app);
 initSocket(server);
 
+//*************** WHEN PRODUCTION MODE IS ON ***************
+
+// const allowedOrigins = [
+//   'http://localhost:3000',          // Local dev
+//   'http://localhost:19006',         // Expo dev (optional)
+//   'exp://localhost:19000',          // Expo LAN
+//   'https://vendor.linque.com',      // Your vendor web domain
+//   'https://linque-server.up.railway.app' // Your backend URL
+// ];
+
+// // Middleware
+// app.use(cors({
+//   origin: allowedOrigins,
+//   methods: ['GET', 'POST', 'PUT', 'DELETE'],
+//   credentials: true
+// }));
+
+//*************** WHEN DEVELOPMENT MODE IS ON ***************
 app.use(cors());
 app.use(express.json());
 
