@@ -9,6 +9,7 @@ import { initSocket } from './socket.js';
 import authRouter from './routes/auth.js';
 import vendorAuthRouter from './routes/VendorAuth.js';
 import slotRoutes from './routes/slotRoutes.js';
+import vendorReservationRoutes from './routes/vendorReservationRoutes.js';
 import reservationRoutes from './routes/reservationRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
@@ -47,6 +48,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/vendor-auth', vendorAuthRouter);
 app.use('/api/slot', slotRoutes);
 app.use('/api/reservation', reservationRoutes);
+app.use('/api/vendor', vendorReservationRoutes);
 app.use('/api/notification', notificationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 

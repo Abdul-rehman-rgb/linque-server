@@ -26,6 +26,7 @@
     "dotenv": "^17.0.1",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^6.9.10",
     "mongoose": "^8.16.1",
     "nodemon": "^3.1.10",
     "path": "^0.12.7",
@@ -33,3 +34,4 @@
     "socket.io": "^4.8.1"
   }
 }
+ 
