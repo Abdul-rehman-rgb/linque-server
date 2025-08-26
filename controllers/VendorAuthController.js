@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import VendorUser from "../Models/VendorUser.js";
 import bcrypt from "bcrypt";
+import { ensureDefaultSlots } from "./../controllers/slotController.js";
 
 const login = async (req, res) => {
   try {
@@ -63,6 +64,15 @@ const signup = async (req, res) => {
       city,
       category
     });
+
+    // Seed default slots for today so dashboard works immediately
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      await ensureDefaultSlots(vendorUser._id, today);
+    } catch (seedingError) {
+      // Do not block signup if seeding fails; just log
+      console.error('Failed to seed default slots for new vendor:', seedingError);
+    }
 
     const token = jwt.sign({ _id: vendorUser._id }, process.env.JWT_SECRET, { expiresIn: "10d" });
 
