@@ -4,21 +4,6 @@ import LayoutUpdateRequest from "../Models/LayoutUpdateRequest.js";
 import nodemailer from "nodemailer";
 import { DEFAULT_SEAT_AVAILABILITY as DEFAULT_SEAT_CONFIG } from "../config/seatConfig.js";
 
-
-// Default seat configuration - this should match your frontend config
-// const DEFAULT_SEAT_CONFIG = {
-//   '2': 4,      // 2 seats: 4 available
-//   '4': 6,      // 4 seats: 6 available
-//   '6': 5,      // 6 seats: 5 available
-//   '8': 3,      // 8 seats: 3 available
-//   '10': 2,     // 10 seats: 2 available
-//   '11-15': 3,  // 11-15 seats: 3 available
-//   '16-20': 1,  // 16-20 seats: 1 available
-//   '20+': 0,    // 20+ seats: 0 available
-//   '30+': 1,    // 30+ seats: 1 available
-//   '50+': 0     // 50+ seats: 0 available
-// };
-
 export const ensureDefaultSlots = async (restaurant, date) => {
   try {
     // Check if slots already exist for this date
@@ -79,7 +64,6 @@ export const ensureDefaultSlots = async (restaurant, date) => {
   }
 };
 
-// Clean up duplicate slots to ensure only one per category per date
 export const cleanupDuplicateSlots = async (restaurant, date) => {
   try {
     console.log(`🧹 Cleaning up duplicate slots for restaurant ${restaurant} on ${date}`);
@@ -364,7 +348,6 @@ export const availabilities = async (req, res) => {
   }
 };
 
-
 export const layout = async (req, res) => {
   try {
     const restaurant = req.vendor._id;
@@ -479,7 +462,6 @@ export const bulkAdjustSlots = async (req, res) => {
   }
 };
 
-// Force reset slots to default values (useful for testing)
 export const forceResetSlots = async (req, res) => {
   try {
     const restaurant = req.vendor._id;

@@ -64,54 +64,70 @@ export const getReservation = async (req, res) => {
 
 export const createWalkIn = async (req, res) => {
   try {
+    const { reservationDate, reservationTime, numberOfPersons, type } = req.body;
     const vendorId = req.vendor._id;
-    const { name, email, reservationDate, reservationTime, numberOfPersons, notes } = req.body;
 
-    let customer = null;
-    if (email) {
-      customer = await User.findOne({ email });
-      if (!customer) {
-        customer = await User.create({ name: name || 'Walk-In', email, password: 'placeholder' });
-      }
-    }
-    if (!customer) {
-      customer = await User.create({ name: name || 'Walk-In', email: `${Date.now()}@walkin.local`, password: 'placeholder' });
-    }
-
+    // round persons to nearest bucket
     const bucketUpper = getSeatBucketUpperBound(numberOfPersons);
-    const slot = await ReservationSlot.findOne({
+
+    // check slot
+    let slot = await ReservationSlot.findOne({
       restaurant: vendorId,
       date: reservationDate,
       time: reservationTime,
       personsPerSlot: bucketUpper,
     });
-    if (!slot || slot.availableSlots <= 0) {
-      return res.status(400).json({ success: false, error: 'No availability' });
+
+    if (!slot) {
+      slot = await ReservationSlot.create({
+        restaurant: vendorId,
+        date: reservationDate,
+        time: reservationTime,
+        personsPerSlot: bucketUpper,
+        availableSlots: 5, // default capacity
+      });
     }
 
+    if (slot.availableSlots <= 0) {
+      return res.status(400).json({ success: false, error: "Slot full" });
+    }
+
+    // reduce slot
     slot.availableSlots -= 1;
     await slot.save();
 
-    const reservation = await Reservation.create({
-      customer: customer._id,
+    // customer logic
+    let customerId = null;
+    if (type === "app") {
+      // assume req.user._id is populated for logged-in app users
+      customerId = req.user?._id;
+      if (!customerId) {
+        return res.status(400).json({ success: false, error: "App booking requires customer" });
+      }
+    } else {
+      // Walk-in → keep null
+      customerId = null;
+    }
+
+    // save booking
+    const booking = await Reservation.create({
       restaurant: vendorId,
       reservationDate,
       reservationTime,
       numberOfPersons,
-      notes,
-      source: 'Walk-In',
+      customer: customerId,
+      type, // "walk-in" | "app"
       slot: slot._id,
     });
 
-    const message = `Walk-in booking for ${numberOfPersons} at ${reservationTime} on ${reservationDate}.`;
-    await Notification.create({ vendor: vendorId, message, type: 'vendor' });
-    emitToVendor(vendorId.toString(), message);
-
-    res.status(201).json({ success: true, reservation });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    emitToVendor(vendorId.toString(), "New reservation created");
+    res.status(201).json({ success: true, data: booking });
+  } catch (err) {
+    console.error("createReservation error:", err);
+    res.status(500).json({ success: false, error: "Server error" });
   }
 };
+
 
 export const updateReservation = async (req, res) => {
   try {
