@@ -18,6 +18,43 @@ const getSeatBucketUpperBound = (guestCount) => {
   return 50;
 };
 
+// export const listReservations = async (req, res) => {
+//   try {
+//     const vendorId = req.vendor._id;
+//     const { date, period, status, source } = req.query;
+
+//     const filter = { restaurant: vendorId };
+//     if (status) filter.status = status;
+//     if (source) filter.source = source;
+
+//     if (date) {
+//       filter.reservationDate = date;
+//     }
+
+//     if (period === "week") {
+//       const now = new Date(date || Date.now());
+//       const start = new Date(now);
+//       start.setDate(now.getDate() - 7);
+//       filter.createdAt = { $gte: start, $lte: now };
+//     }
+
+//     if (period === "month") {
+//       const now = new Date(date || Date.now());
+//       const start = new Date(now);
+//       start.setMonth(now.getMonth() - 1);
+//       filter.createdAt = { $gte: start, $lte: now };
+//     }
+
+//     const reservations = await Reservation.find(filter)
+//       .populate("customer", "name email")
+//       .sort({ createdAt: -1 });
+
+//     res.status(200).json({ success: true, reservations });
+//   } catch (error) {
+//     res.status(500).json({ success: false, error: error.message });
+//   }
+// };
+
 export const listReservations = async (req, res) => {
   try {
     const vendorId = req.vendor._id;
@@ -26,36 +63,51 @@ export const listReservations = async (req, res) => {
     const filter = { restaurant: vendorId };
     if (status) filter.status = status;
     if (source) filter.source = source;
-    if (date) filter.reservationDate = date;
 
-    if (period === 'week') {
+    // Filtering by reservationDate
+    if (date) {
+      filter.reservationDate = date;
+    }
+
+    if (period === "week") {
       const now = new Date(date || Date.now());
       const start = new Date(now);
       start.setDate(now.getDate() - 7);
-      filter.createdAt = { $gte: start, $lte: now };
+
+      // Only compare reservationDate, not createdAt
+      filter.reservationDate = { $gte: start.toISOString().slice(0, 10), $lte: now.toISOString().slice(0, 10) };
     }
-    if (period === 'month') {
+
+    if (period === "month") {
       const now = new Date(date || Date.now());
       const start = new Date(now);
       start.setMonth(now.getMonth() - 1);
-      filter.createdAt = { $gte: start, $lte: now };
+
+      filter.reservationDate = { $gte: start.toISOString().slice(0, 10), $lte: now.toISOString().slice(0, 10) };
     }
 
     const reservations = await Reservation.find(filter)
-      .populate('customer', 'name email')
-      .sort({ createdAt: -1 });
+      .populate("customer", "name email")
+      .sort({ reservationDate: -1, reservationTime: 1 });
 
     res.status(200).json({ success: true, reservations });
+    console.log(reservations);
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
+    console.log(error);
   }
 };
+
 
 export const getReservation = async (req, res) => {
   try {
     const { id } = req.params;
-    const reservation = await Reservation.findById(id).populate('customer', 'name email');
-    if (!reservation) return res.status(404).json({ success: false, error: 'Not found' });
+    const reservation = await Reservation.findById(id).populate(
+      "customer",
+      "name email"
+    );
+    if (!reservation)
+      return res.status(404).json({ success: false, error: "Not found" });
     res.status(200).json({ success: true, reservation });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -64,7 +116,8 @@ export const getReservation = async (req, res) => {
 
 export const createWalkIn = async (req, res) => {
   try {
-    const { reservationDate, reservationTime, numberOfPersons, type } = req.body;
+    const { reservationDate, reservationTime, numberOfPersons, type, customerName, notes } =
+      req.body;
     const vendorId = req.vendor._id;
 
     // round persons to nearest bucket
@@ -102,7 +155,9 @@ export const createWalkIn = async (req, res) => {
       // assume req.user._id is populated for logged-in app users
       customerId = req.user?._id;
       if (!customerId) {
-        return res.status(400).json({ success: false, error: "App booking requires customer" });
+        return res
+          .status(400)
+          .json({ success: false, error: "App booking requires customer" });
       }
     } else {
       // Walk-in → keep null
@@ -116,6 +171,8 @@ export const createWalkIn = async (req, res) => {
       reservationTime,
       numberOfPersons,
       customer: customerId,
+      customerName,
+      notes,
       type, // "walk-in" | "app"
       slot: slot._id,
     });
@@ -128,33 +185,55 @@ export const createWalkIn = async (req, res) => {
   }
 };
 
-
 export const updateReservation = async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
     const before = await Reservation.findById(id);
-    if (!before) return res.status(404).json({ success: false, error: 'Not found' });
+    if (!before)
+      return res.status(404).json({ success: false, error: "Not found" });
 
     let slotToUse = null;
-    if (updates.numberOfPersons || updates.reservationTime || updates.reservationDate) {
+    if (
+      updates.numberOfPersons ||
+      updates.reservationTime ||
+      updates.reservationDate
+    ) {
       const num = updates.numberOfPersons || before.numberOfPersons;
       const date = updates.reservationDate || before.reservationDate;
       const time = updates.reservationTime || before.reservationTime;
       const bucketUpper = getSeatBucketUpperBound(num);
-      slotToUse = await ReservationSlot.findOne({ restaurant: before.restaurant, date, time, personsPerSlot: bucketUpper });
-      if (!slotToUse || slotToUse.availableSlots <= 0) return res.status(400).json({ success: false, error: 'No availability for updated slot' });
+      slotToUse = await ReservationSlot.findOne({
+        restaurant: before.restaurant,
+        date,
+        time,
+        personsPerSlot: bucketUpper,
+      });
+      if (!slotToUse || slotToUse.availableSlots <= 0)
+        return res
+          .status(400)
+          .json({ success: false, error: "No availability for updated slot" });
     }
 
-    if (slotToUse && before.slot && String(before.slot) !== String(slotToUse._id)) {
+    if (
+      slotToUse &&
+      before.slot &&
+      String(before.slot) !== String(slotToUse._id)
+    ) {
       const prev = await ReservationSlot.findById(before.slot);
-      if (prev) { prev.availableSlots += 1; await prev.save(); }
-      slotToUse.availableSlots -= 1; await slotToUse.save();
+      if (prev) {
+        prev.availableSlots += 1;
+        await prev.save();
+      }
+      slotToUse.availableSlots -= 1;
+      await slotToUse.save();
       updates.slot = slotToUse._id;
     }
 
-    const reservation = await Reservation.findByIdAndUpdate(id, updates, { new: true });
-    emitToVendor(reservation.restaurant.toString(), 'Reservation updated');
+    const reservation = await Reservation.findByIdAndUpdate(id, updates, {
+      new: true,
+    });
+    emitToVendor(reservation.restaurant.toString(), "Reservation updated");
     res.status(200).json({ success: true, reservation });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -165,13 +244,17 @@ export const deleteReservation = async (req, res) => {
   try {
     const { id } = req.params;
     const reservation = await Reservation.findById(id);
-    if (!reservation) return res.status(404).json({ success: false, error: 'Not found' });
+    if (!reservation)
+      return res.status(404).json({ success: false, error: "Not found" });
     if (reservation.slot) {
       const slot = await ReservationSlot.findById(reservation.slot);
-      if (slot) { slot.availableSlots += 1; await slot.save(); }
+      if (slot) {
+        slot.availableSlots += 1;
+        await slot.save();
+      }
     }
     await Reservation.findByIdAndDelete(id);
-    emitToVendor(reservation.restaurant.toString(), 'Reservation deleted');
+    emitToVendor(reservation.restaurant.toString(), "Reservation deleted");
     res.status(200).json({ success: true });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -182,10 +265,18 @@ export const sendReminder = async (req, res) => {
   try {
     const { id } = req.params;
     const reservation = await Reservation.findById(id);
-    if (!reservation) return res.status(404).json({ success: false, error: 'Not found' });
-    if (reservation.reminderSent) return res.status(400).json({ success: false, error: 'Reminder already sent' });
+    if (!reservation)
+      return res.status(404).json({ success: false, error: "Not found" });
+    if (reservation.reminderSent)
+      return res
+        .status(400)
+        .json({ success: false, error: "Reminder already sent" });
     const message = `Reminder: Your reservation is on ${reservation.reservationDate} at ${reservation.reservationTime}.`;
-    await Notification.create({ user: reservation.customer, message, type: 'customer' });
+    await Notification.create({
+      user: reservation.customer,
+      message,
+      type: "customer",
+    });
     reservation.reminderSent = true;
     await reservation.save();
     emitToUser(reservation.customer.toString(), message);
@@ -202,11 +293,11 @@ export const bookingTicker = async (req, res) => {
     const filter = { restaurant: vendorId };
     if (date) filter.reservationDate = date;
     if (time) filter.reservationTime = time;
-    const reservations = await Reservation.find(filter).sort({ createdAt: -1 }).limit(50);
+    const reservations = await Reservation.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(50);
     res.status(200).json({ success: true, reservations });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 };
-
-

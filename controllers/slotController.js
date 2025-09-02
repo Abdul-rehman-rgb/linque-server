@@ -391,7 +391,7 @@ export const requestUpdate = async (req, res) => {
 
     const mailOptions = {
       from: process.env.SMTP_FROM || process.env.SMTP_USER,
-      to: 'qureshihibban@gmail.com',
+      to: 'abdul4758rehman@gmail.com',
       subject: 'Layout Update Request',
       text: `Vendor: ${request.restaurantName}\nVendorId: ${request.vendor}\nContact: ${request.contactEmail}\nMessage: ${message || ''}`
     };
